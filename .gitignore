@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# LaTeX (auxiliares)
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Documentos del proyecto (de terceros, no se publican)
+/2MHS08-*.pdf
+
+# Editores
+.vscode/
+.idea/

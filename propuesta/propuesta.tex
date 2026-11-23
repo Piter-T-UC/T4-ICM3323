@@ -1,0 +1,438 @@
+\documentclass[11pt]{article}
+
+%================================================================
+% Paquetes (mismo estilo que las tareas)
+%================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,shorthands=off]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{mathpazo}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{array}
+\usetikzlibrary{patterns, arrows.meta, decorations.pathmorphing, calc}
+
+\definecolor{ucred}{RGB}{117,26,41}
+\definecolor{devcolor}{RGB}{45,70,95}
+\definecolor{acero}{RGB}{120,130,145}
+\definecolor{agua}{RGB}{40,110,180}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{ucred}}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.4em}{0.8em}
+
+\newtcolorbox{desarrollo}[1]{
+  enhanced, breakable,
+  colback=white, colframe=devcolor,
+  coltitle=white, fonttitle=\bfseries,
+  title={#1},
+  boxrule=0.8pt, arc=1.5mm,
+  top=8pt, bottom=8pt, left=9pt, right=9pt
+}
+
+\captionsetup{font=small, labelfont={bf,color=ucred}}
+
+% cota: \cota{p1}{p2}{texto}{posicion del texto}
+\tikzset{cota/.style={<->, >={Stealth[length=1.6mm]}, thin}}
+
+\begin{document}
+
+\begin{center}
+    {\scshape\large Pontificia Universidad Cat\'olica de Chile}\\[2pt]
+    {\scshape Escuela de Ingenier\'ia}\\[2pt]
+    {\small Departamento de Ingenier\'ia Mec\'anica y Metal\'urgica}\\[2pt]
+    {\small ICM 3323 --- Elementos Finitos en Dise\~no Mec\'anico}\\[10pt]
+    {\color{ucred}\rule{0.42\linewidth}{0.6pt}}\\[10pt]
+    {\Huge\bfseries\color{ucred} PROYECTO T4}\\[6pt]
+    {\Large\bfseries Optimizaci\'on del blindaje de acero de una compuerta de fondo}\\[4pt]
+    {\large Propuesta de proyecto}
+\end{center}
+
+\vspace{4pt}
+\begin{flushright}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{rl}
+    Nombre: & Pedro Pablo Taboada Santiba\~nez \\
+    Fecha:  & \today\\
+\end{tabular}
+\end{flushright}
+
+\vspace{0.3cm}
+
+%================================================================
+\section{Contexto}
+%================================================================
+
+El desag\"ue de fondo (\emph{bottom outlet}) del Proyecto Hidroel\'ectrico Los Lagos se controla con dos
+compuertas deslizantes con bonete (\emph{bonneted sliding gates}) dispuestas en serie: una de guardia
+aguas arriba y una de servicio aguas abajo. El conducto es rectangular, de
+$2300 \times 4600$~mm, con el radier en la cota 78.01~m s.n.m.\ y el nivel de dise\~no (crecida
+$Q_{1000}$) en la cota 111.0~m s.n.m., es decir, unos 33~m de columna de agua sobre el radier.
+
+Para reforzar el hormig\'on en la zona de las compuertas, el conducto se reviste con un
+\textbf{blindaje de acero} (\emph{steel lining}) formado por planchas soldadas en forma de caj\'on
+rectangular. Hay tres tramos: uno aguas arriba de la primera compuerta (1500~mm), uno entre
+compuertas (1420~mm) y uno aguas abajo de la segunda (1500~mm), como se ve en la
+figura~\ref{fig:corte}. Las planchas se anclan al hormig\'on con pernos M20 (\emph{stud bolts}) soldados
+a la cara exterior, con una cabeza especial de 100~mm de di\'ametro embebida en el hormig\'on.
+
+Los datos vienen del informe de c\'alculo de Voith \emph{1530-VOI-320-0-CC-0072} (cap.~8, \emph{Steel
+lining}) y de los planos \emph{2MHS08-0100-10135897} (cargas de fundaci\'on) y
+\emph{2MHS08-0101-10136557} (disposici\'on general).
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=1.45cm, y=0.62cm, >={Stealth[length=2mm]}]
+  % ---- tramos (en m): tunel | aguas arriba | compuerta 1 | entre | compuerta 2 | aguas abajo | tunel
+  \def\H{4.6}
+  \coordinate (u0) at (0,0);
+  % hormigon arriba y abajo
+  \fill[pattern=north east lines, pattern color=gray!70] (-0.2,-1.0) rectangle (8.6,0);
+  \fill[pattern=north east lines, pattern color=gray!70] (-0.2,\H) rectangle (2.55,\H+1.0);
+  \fill[pattern=north east lines, pattern color=gray!70] (2.95,\H) rectangle (4.37,\H+1.0);
+  \fill[pattern=north east lines, pattern color=gray!70] (4.77,\H) rectangle (8.6,\H+1.0);
+  % agua
+  \fill[agua!8] (-0.2,0) rectangle (8.6,\H);
+  % blindajes (linea gruesa en radier y techo)
+  \foreach \xa/\xb in {1.05/2.55, 2.95/4.37, 4.77/6.27}{
+    \draw[line width=2.4pt, devcolor] (\xa,0) -- (\xb,0);
+    \draw[line width=2.4pt, devcolor] (\xa,\H) -- (\xb,\H);
+  }
+  % compuertas (hoja + bonete hacia arriba)
+  \foreach \xg in {2.55, 4.37}{
+    \fill[gray!25] (\xg,\H) rectangle (\xg+0.4,\H+1.6);
+    \draw (\xg,\H) -- (\xg,\H+1.6) (\xg+0.4,\H) -- (\xg+0.4,\H+1.6);
+    \fill[acero!70] (\xg+0.12,0) rectangle (\xg+0.28,\H);
+    \draw[thick] (\xg+0.12,0) rectangle (\xg+0.28,\H);
+  }
+  \node[font=\small, align=center] at (2.75,\H+2.1) {compuerta 1\\(guardia)};
+  \node[font=\small, align=center] at (4.57,\H+2.1) {compuerta 2\\(servicio)};
+  % contorno del conducto
+  \draw[thick] (-0.2,0) -- (8.6,0) (-0.2,\H) -- (2.55,\H) (2.95,\H) -- (4.37,\H) (4.77,\H) -- (8.6,\H);
+  % flujo
+  \draw[->, very thick, agua] (-0.05,\H/2) -- (0.95,\H/2) node[midway, above, font=\small] {flujo};
+  % cotas de los blindajes
+  \foreach \xa/\xb/\txt in {1.05/2.55/1500, 2.95/4.37/1420, 4.77/6.27/1500}{
+    \draw[cota] (\xa,-1.6) -- (\xb,-1.6) node[midway, fill=white, inner sep=1pt, font=\small] {\txt};
+    \draw[thin, gray] (\xa,-0.1) -- (\xa,-1.8) (\xb,-0.1) -- (\xb,-1.8);
+  }
+  \node[font=\footnotesize, text=devcolor, align=center] at (1.8,\H-1.3) {blindaje\\aguas\\arriba};
+  \node[font=\footnotesize, text=devcolor, align=center] at (3.66,\H-1.3) {blindaje\\entre\\compuertas};
+  \node[font=\footnotesize, text=devcolor, align=center] at (5.52,\H-1.3) {blindaje\\aguas\\abajo};
+  % alto y cotas de nivel
+  \draw[cota] (7.6,0) -- (7.6,\H) node[midway, fill=agua!8, inner sep=1pt, font=\small] {4600};
+  \node[font=\scriptsize, anchor=west] at (8.6,0) {EL 78.01};
+  \node[font=\scriptsize, anchor=west] at (8.6,\H) {EL 82.61};
+  \node[font=\small, fill=white, inner sep=1pt] at (0.6,-0.5) {hormig\'on};
+\end{tikzpicture}
+\caption{Corte longitudinal esquem\'atico del desag\"ue de fondo (no est\'a a escala). En azul, los tres
+tramos de blindaje; medidas en mm.}
+\label{fig:corte}
+\end{figure}
+
+%================================================================
+\section{Motivaci\'on}
+%================================================================
+
+El caso que dimensiona el blindaje es el \textbf{conducto vac\'io}: el agua que se filtra por el
+hormig\'on queda detr\'as de las planchas con la presi\'on del embalse y las empuja hacia adentro del
+conducto. Esa presi\'on es \textbf{hidrost\'atica}: crece con la profundidad bajo el nivel de dise\~no,
+\[
+  p(y) = \gamma_w\,\big(111.0 - \text{cota}(y)\big),
+\]
+desde 2.839~kgf/cm$^2$ en el techo del conducto (cota 82.61) hasta 3.299~kgf/cm$^2$ en el radier (cota
+78.01, 32.99~m de columna de agua). El informe original simplifica y aplica el valor del radier,
+3.299~kgf/cm$^2$, constante en todo el contorno; con la distribuci\'on real las paredes y el techo
+quedan un 7 a 14\,\% menos cargados, y adem\'as aparece un empuje neto hacia arriba sobre el tramo.
+En ese estado el hormig\'on \emph{no} sostiene la plancha (no puede tirar de ella): la plancha trabaja
+como una placa delgada en flexi\'on apoyada solo en los pernos, y toda la carga pasa por ellos al
+hormig\'on.
+
+El dise\~no original usa planchas de 20~mm (18~mm de c\'alculo con 2~mm de corrosi\'on) y pernos a no
+m\'as de 300~mm entre s\'i y a no m\'as de 125~mm de los bordes, unos 290 pernos por tramo. Se verific\'o
+con un modelo de placas en Midas: la tensi\'on m\'axima en la plancha es de unos 824~kgf/cm$^2$ y la
+reacci\'on m\'axima en un perno de unos 2600~kgf, mientras que la tensi\'on admisible en operaci\'on
+normal es de 2100--2400~kgf/cm$^2$ (DIN~19704). La plancha trabaja a menos del 40\,\% de lo admisible:
+\textbf{el dise\~no es muy conservador} y hay espacio para ahorrar acero, pernos o ambos.
+
+Las dos variables no son independientes. Con una plancha m\'as delgada baja el peso de acero, pero la
+plancha flecta m\'as y necesita pernos m\'as juntos; con m\'as pernos sube el costo de soldadura
+(cada perno lleva un filete de 12~mm), de perforaci\'on y de montaje. La pregunta del proyecto es
+d\'onde est\'a el equilibrio:
+
+\begin{desarrollo}{Pregunta del proyecto}
+?`Qu\'e combinaci\'on de \textbf{espesor de plancha} y \textbf{distribuci\'on de pernos} da el blindaje
+de menor costo que siga cumpliendo con las tensiones admisibles en la plancha, la capacidad de los
+pernos y una flecha razonable, bajo la presi\'on de filtraci\'on con el conducto vac\'io?
+\end{desarrollo}
+
+%================================================================
+\section{Problema y modelo}
+%================================================================
+
+Se modela un tramo de blindaje como un caj\'on rectangular de acero de ancho interior $a = 2300$~mm,
+alto interior $b = 4600$~mm, largo $L$ (1500 o 1420~mm) y espesor $t$, con el acero por fuera del hueco
+(lado del hormig\'on), figura~\ref{fig:iso}. Los ejes son los del c\'odigo: $x$ en el ancho, $y$ en el
+alto y $z$ a lo largo del t\'unel.
+
+\begin{itemize}[leftmargin=1.3em, itemsep=2pt]
+  \item \textbf{Material:} ASTM A572 Gr~50, el\'astico lineal, $E = 2.1\times10^{6}$~kgf/cm$^2$,
+        $\nu = 0.3$.
+  \item \textbf{Carga:} presi\'on hidrost\'atica $p(y) = \gamma_w\,(111.0 - \text{cota})$ en la cara
+        exterior de las cuatro paredes, hacia adentro del conducto ($\gamma_w = 1000$~kgf/m$^3$, de
+        3.299~kgf/cm$^2$ en el radier a 2.839~kgf/cm$^2$ en el techo). Lineal en $y$ e igual a lo largo
+        de $z$. Tambi\'en se correr\'a con $p$ constante igual al valor del radier, para comparar con
+        el informe.
+  \item \textbf{Pernos:} cada perno es un apoyo de rotula en la cara exterior:
+        $u_x = u_y = u_z = 0$ y giro libre (como en el informe original).
+  \item \textbf{Extremos} $z = 0$ y $z = L$: donde el tramo toca la compuerta o el siguiente tramo se
+        supone sin desplazamiento, como en el informe.
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x={(1cm,0cm)}, y={(0cm,1cm)}, z={(0.78cm,0.5cm)}, >={Stealth[length=1.8mm]}]
+  \def\A{1.1}  \def\B{2.2}  \def\T{0.14}  \def\L{3.0}
+  \pgfmathsetmacro{\Ao}{\A+\T} \pgfmathsetmacro{\Bo}{\B+\T}
+  % caras interiores que se ven por la abertura
+  \fill[gray!8] (-\A,-\B,0) -- (-\A,-\B,\L) -- (-\A,\B,\L) -- (-\A,\B,0) -- cycle;
+  \fill[gray!14] (-\A,-\B,0) -- (\A,-\B,0) -- (\A,-\B,\L) -- (-\A,-\B,\L) -- cycle;
+  \draw[gray!60] (-\A,-\B,\L) -- (\A,-\B,\L) (-\A,-\B,\L) -- (-\A,\B,\L);
+  % cara exterior derecha y techo
+  \fill[acero!35] (\Ao,-\Bo,0) -- (\Ao,-\Bo,\L) -- (\Ao,\Bo,\L) -- (\Ao,\Bo,0) -- cycle;
+  \fill[acero!20] (-\Ao,\Bo,0) -- (\Ao,\Bo,0) -- (\Ao,\Bo,\L) -- (-\Ao,\Bo,\L) -- cycle;
+  \draw (\Ao,-\Bo,0) -- (\Ao,-\Bo,\L) -- (\Ao,\Bo,\L) -- (-\Ao,\Bo,\L) -- (-\Ao,\Bo,0);
+  \draw (\Ao,\Bo,0) -- (\Ao,\Bo,\L);
+  % union de planchas (esquinas soldadas) y pernos
+  \foreach \zz in {0.35, 1.1, 1.9, 2.65}{
+    \foreach \yy in {-1.95,-1.4,...,2.0}{ \fill[ucred] (\Ao,\yy,\zz) circle (1.3pt); }
+    \foreach \xx in {-0.85,-0.3,0.25,0.8}{ \fill[ucred] (\xx,\Bo,\zz) circle (1.3pt); }
+  }
+  % cara frontal (anillo de acero)
+  \fill[acero!70, even odd rule] (-\Ao,-\Bo,0) -- (\Ao,-\Bo,0) -- (\Ao,\Bo,0) -- (-\Ao,\Bo,0) -- cycle
+                                  (-\A,-\B,0) -- (\A,-\B,0) -- (\A,\B,0) -- (-\A,\B,0) -- cycle;
+  \draw (-\Ao,-\Bo,0) -- (\Ao,-\Bo,0) -- (\Ao,\Bo,0) -- (-\Ao,\Bo,0) -- cycle
+        (-\A,-\B,0) -- (\A,-\B,0) -- (\A,\B,0) -- (-\A,\B,0) -- cycle;
+  % presion (desde el hormigon hacia adentro)
+  % presion hidrostatica en la pared derecha: crece hacia abajo (variacion exagerada en el dibujo)
+  \foreach \yy in {-2.0,-1.2,-0.4,0.4,1.2,2.0}{
+    \pgfmathsetmacro{\lp}{0.75 - 0.12*\yy}
+    \draw[->, agua, thick] (\Ao+\lp,\yy,1.5) -- (\Ao+0.05,\yy,1.5);
+  }
+  \draw[agua] (\Ao+0.75+0.24,-2.0,1.5) -- (\Ao+0.75-0.24,2.0,1.5);
+  \foreach \xx in {-0.6,0.5}{
+    \draw[->, agua, thick] (\xx,\Bo+0.5,2.0) -- (\xx,\Bo+0.05,2.0);
+  }
+  \node[agua, font=\small, anchor=west] at (\Ao+1.0,0.0,1.5) {$p(y)$};
+  % cotas
+  \draw[cota] (-\A,-\B-0.45,0) -- (\A,-\B-0.45,0) node[midway, below, font=\small] {$a$};
+  \draw[cota] (-\A-0.5,-\B,0) -- (-\A-0.5,\B,0) node[midway, left, font=\small] {$b$};
+  \draw[cota] (\Ao+0.25,-\Bo,0) -- (\Ao+0.25,-\Bo,\L) node[midway, below right, font=\small] {$L$};
+  \draw[<-, thin] (-\A-0.07,1.2,0) -- ++(-0.9,0.5,0) node[left, font=\small] {espesor $t$};
+  % ejes
+  \begin{scope}[shift={(-2.8,-2.6,0)}]
+    \draw[->] (0,0,0) -- (0.7,0,0) node[right, font=\small] {$x$};
+    \draw[->] (0,0,0) -- (0,0.7,0) node[above, font=\small] {$y$};
+    \draw[->] (0,0,0) -- (0,0,0.9) node[above right, font=\small] {$z$};
+  \end{scope}
+  % leyenda
+  \fill[ucred] (0.6,-3.5) circle (1.6pt) node[right, black, font=\small] {perno M20 (cara exterior)};
+\end{tikzpicture}
+\caption{Tramo de blindaje modelado: caj\'on de acero de espesor $t$ (exagerado) con pernos en la cara
+exterior y la presi\'on hidrost\'atica de filtraci\'on $p(y)$ empujando hacia adentro (la variaci\'on con
+la altura est\'a exagerada).}
+\label{fig:iso}
+\end{figure}
+
+%================================================================
+\section{Variables de dise\~no, objetivo y restricciones}
+%================================================================
+
+El ancho de las planchas queda fijo; se var\'ia el espesor y c\'omo se reparten los pernos en cada
+plancha (figura~\ref{fig:desarrollo}):
+
+\begin{itemize}[leftmargin=1.3em, itemsep=2pt]
+  \item $t$: espesor de plancha, en espesores comerciales (12 a 25~mm) m\'as 2~mm de corrosi\'on que no
+        se cuentan en la resistencia.
+  \item $p_s$: separaci\'on m\'axima entre pernos a lo largo del contorno (en cada pared).
+  \item $p_z$: separaci\'on m\'axima entre pernos a lo largo del t\'unel.
+  \item $e$: distancia de los pernos al borde de la plancha.
+\end{itemize}
+Con $p_s$, $p_z$ y $e$ el c\'odigo reparte los pernos en una grilla pareja dentro de cada plancha; tambi\'en
+acepta cualquier otra distribuci\'on (tresbolillo, m\'as densa cerca de las esquinas, etc.).
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=1.15cm, y=1.15cm, >={Stealth[length=1.6mm]}]
+  % pared desarrollada: s horizontal, z vertical
+  \fill[acero!15] (0,0) rectangle (9.2,4.5);
+  \draw[thick] (9.2,0) -- (0,0) -- (0,4.5) -- (9.2,4.5);
+  \draw[decorate, decoration={zigzag, segment length=6pt, amplitude=2pt}] (9.2,0) -- (9.2,4.5);
+  % pernos: e = 0.6, p_s = 1.35, p_z = 1.1
+  \foreach \i in {0,...,6}{
+    \foreach \j in {0,...,3}{
+      \fill[ucred] ({0.6+1.35*\i},{0.6+1.1*\j}) circle (2.4pt);
+    }
+  }
+  % cotas
+  \draw[cota] (0,-0.35) -- (0.6,-0.35) node[midway, below, font=\small] {$e$};
+  \draw[cota] (0.6,-0.35) -- (1.95,-0.35) node[midway, below, font=\small] {$p_s$};
+  \draw[cota] (1.95,-0.35) -- (3.3,-0.35) node[midway, below, font=\small] {$p_s$};
+  \draw[thin, gray] (0.6,0.5) -- (0.6,-0.5) (1.95,0.5) -- (1.95,-0.5) (3.3,0.5) -- (3.3,-0.5);
+  \draw[cota] (-0.35,0) -- (-0.35,0.6) node[midway, left, font=\small] {$e$};
+  \draw[cota] (-0.35,0.6) -- (-0.35,1.7) node[midway, left, font=\small] {$p_z$};
+  \draw[cota] (-0.35,1.7) -- (-0.35,2.8) node[midway, left, font=\small] {$p_z$};
+  \draw[thin, gray] (0.5,0.6) -- (-0.5,0.6) (0.5,1.7) -- (-0.5,1.7) (0.5,2.8) -- (-0.5,2.8);
+  % rotulos
+  \node[rotate=90, font=\small, anchor=south] at (-1.15,2.25) {$z$ (eje del t\'unel)};
+  \node[font=\small] at (4.6,-1.15) {$s$ (a lo largo de la pared)};
+  \node[font=\small, anchor=south west, align=left] at (0,4.55) {extremo $z = L$};
+  \node[font=\small, anchor=north west, align=left] at (5.4,-0.15) {extremo $z = 0$};
+  \node[font=\small, rotate=90, anchor=north] at (0.05,3.6) {esquina};
+  \node[font=\small, anchor=south east] at (9.2,4.55) {plancha de espesor $t$};
+\end{tikzpicture}
+\caption{Desarrollo de una pared vista desde el hormig\'on: grilla de pernos definida por la distancia
+al borde $e$ y las separaciones $p_s$ y $p_z$ (variables de dise\~no).}
+\label{fig:desarrollo}
+\end{figure}
+
+\paragraph{Objetivo.} Minimizar el costo de un tramo,
+\[
+  C(t, p_s, p_z, e) = c_a\,\rho\,\big[(a+2t)(b+2t) - a\,b\big]\,L \;+\; c_p\,N_p(p_s, p_z, e),
+\]
+con $\rho = 7850$~kg/m$^3$, $c_a$ el costo por kilo de acero instalado, $N_p$ el n\'umero de pernos y
+$c_p$ el costo de un perno instalado (perno, soldadura y montaje). La relaci\'on $c_p/c_a$ se dejar\'a como
+par\'ametro para ver c\'omo cambia el dise\~no \'optimo.
+
+\paragraph{Restricciones.} Resumidas en la tabla~\ref{tab:restricciones}.
+
+\begin{table}[h]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright}p{4.2cm} >{\raggedright}p{5.2cm} p{4.6cm}}
+\toprule
+\textbf{Restricci\'on} & \textbf{Condici\'on} & \textbf{Fuente / valor} \\
+\midrule
+Tensi\'on en la plancha & $\sigma_{VM} \le \sigma_{adm}$ (lejos del perno, ver \S\ref{sec:metodo}) &
+  2100~kgf/cm$^2$, operaci\'on normal (DIN 19704) \\
+Tracci\'on en el perno & $R/A_s \le \sigma_{adm}$ & M20: $A_s = 3.14$~cm$^2$ \\
+Soldadura del perno & $R/A_w \le \tau_{adm}$ & filete de 12~mm alrededor del perno \\
+Arranque del hormig\'on & $R/(\pi D h) \le \tau_c$ & $D = 10$~cm, $h = 15$~cm, $\tau_c = 15$~kgf/cm$^2$ \\
+Flecha & $w_{max} \le w_{adm}$ & a definir (p.\,ej. $p_s/500$) \\
+Geometr\'ia & $e \le 125$~mm, $p_s, p_z \ge p_{min}$ & informe original; montaje \\
+\bottomrule
+\end{tabular}
+\caption{Restricciones del dise\~no. $R$ es la reacci\'on del perno m\'as cargado que entrega el MEF.}
+\label{tab:restricciones}
+\end{table}
+
+%================================================================
+\section{Metodolog\'ia}
+\label{sec:metodo}
+%================================================================
+
+El blindaje se analiza con un c\'odigo propio de elementos finitos 3D en Python, que extiende el
+solver 2D de las tareas anteriores (mismas etapas: malla, interpolaci\'on, matrices, resoluci\'on y
+gr\'aficos).
+
+\begin{enumerate}[leftmargin=1.3em, itemsep=3pt]
+  \item \textbf{Elementos.} Hexaedros isoparam\'etricos H8, H20 y H27; sus caras son los
+        cuadril\'ateros Q4, Q8 y Q9 del c\'odigo 2D, que se reutilizan para integrar la presi\'on. Para
+        el blindaje se usa H20 con un solo elemento en el espesor: con H8 la plancha delgada se traba en
+        flexi\'on (\emph{shear locking}).
+  \item \textbf{Malla.} Estructurada y param\'etrica: las l\'ineas de la malla pasan por las esquinas
+        del caj\'on, las uniones de planchas y cada perno, de modo que cada perno cae en un nodo de la
+        cara exterior. Cambiar $t$, $p_s$, $p_z$ o $e$ regenera la malla autom\'aticamente.
+  \item \textbf{Cargas.} La presi\'on se integra sobre las caras exteriores con las funciones de forma de
+        la cara; la presi\'on hidrost\'atica se interpola desde sus valores en los nodos, lo que es exacto
+        porque var\'ia linealmente con la cota.
+  \item \textbf{Resoluci\'on.} Rigidez ensamblada dispersa, $K\,U = F$ con las restricciones de los
+        pernos y los extremos, tensiones nodales promediadas y reacciones en los pernos.
+  \item \textbf{Validaci\'on (ya hecha).} Pruebas de parche y de modos r\'igidos de cada elemento; un
+        voladizo de plancha de 18~mm frente a Euler--Bernoulli; y un pa\~no de plancha entre cuatro
+        pernos frente a la soluci\'on exacta de Kirchhoff para una placa sobre una grilla de apoyos
+        (serie de Fourier, $w_c = 0.00580\,q a^4/D$). Con H20 y unos cuatro elementos por media luz
+        entre pernos, la flecha y la tensi\'on quedan a menos de 1--3\,\% de la teor\'ia.
+  \item \textbf{Tensi\'on junto al perno.} Un apoyo de un solo nodo en un s\'olido concentra la
+        reacci\'on en un punto, y ah\'i la tensi\'on depende del tama\~no de los elementos (figura~\ref{fig:pano}).
+        Por eso la tensi\'on en la plancha se eval\'ua en el centro del pa\~no y a una distancia fija
+        del perno (el borde de la soldadura), con la misma malla para todos los dise\~nos.
+  \item \textbf{Exploraci\'on.} Barrido param\'etrico de $t$ (espesores comerciales) y de $(p_s, p_z, e)$.
+        Para cada combinaci\'on se calcula el costo y se revisan las restricciones, y se arma un mapa de
+        dise\~nos factibles en el que se elige el de menor costo.
+\end{enumerate}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm, >={Stealth[length=1.6mm]}]
+  % hormigon arriba
+  \fill[pattern=north east lines, pattern color=gray!70] (-0.6,0.55) rectangle (12.6,1.9);
+  \node[font=\small, fill=white, inner sep=1.5pt] at (9.0,1.45) {hormig\'on};
+  % film de agua (presion)
+  \fill[agua!10] (-0.6,0.3) rectangle (12.6,0.55);
+  % plancha
+  \fill[acero!60] (-0.6,0) rectangle (12.6,0.3);
+  \draw (-0.6,0) -- (12.6,0) (-0.6,0.3) -- (12.6,0.3);
+  % pernos (rotulas) en 0, 6, 12
+  \foreach \xp in {0,6,12}{
+    \draw[line width=2pt, ucred] (\xp,0.3) -- (\xp,1.45);
+    \fill[ucred] (\xp-0.35,1.4) rectangle (\xp+0.35,1.55);
+    \draw[ucred, fill=white, thick] (\xp,0.3) circle (2.2pt);
+  }
+  % presion
+  \foreach \xx in {0.6,1.4,...,5.6, 6.6,7.4,...,11.6}{
+    \draw[->, agua] (\xx,0.95) -- (\xx,0.33);
+  }
+  \node[agua, font=\small, fill=white, inner sep=1pt] at (3,1.15) {$p$};
+  % deformada
+  \draw[dashed, thick, devcolor] (0,0) .. controls (2,-1.45) and (4,-1.45) .. (6,0)
+                                       .. controls (8,-1.45) and (10,-1.45) .. (12,0);
+  \node[font=\small, text=devcolor] at (9,-0.5) {deformada};
+  % puntos criticos
+  \fill[ucred] (3,-1.08) circle (2pt);
+  \node[font=\small, anchor=north, align=center] at (2.5,-1.2) {$\sigma_c$ (centro del pa\~no,\\cara interior en tracci\'on)};
+  \draw[->, thin] (6,-1.6) -- (6,-0.1);
+  \node[font=\small, anchor=north] at (6,-1.6) {$\sigma_p$ junto al perno};
+  % cotas
+  \draw[cota] (0,2.2) -- (6,2.2) node[midway, fill=white, inner sep=1pt, font=\small] {$p_s$ o $p_z$};
+  \draw[thin, gray] (0,1.6) -- (0,2.35) (6,1.6) -- (6,2.35);
+  \draw[cota] (12.95,0) -- (12.95,0.3);
+  \node[font=\small, anchor=west] at (13.05,0.15) {$t$};
+  \node[font=\small, anchor=west, fill=white, inner sep=1.5pt] at (6.45,1.0) {perno M20: $u = 0$, giro libre};
+  \node[font=\small, anchor=north] at (10.1,-1.4) {interior del conducto (vac\'io)};
+\end{tikzpicture}
+\caption{Corte de la plancha entre pernos: la presi\'on de filtraci\'on $p$ la empuja hacia el conducto y
+los pernos la sujetan. Las tensiones a controlar son $\sigma_c$ en el centro del pa\~no y $\sigma_p$ a
+una distancia fija del perno.}
+\label{fig:pano}
+\end{figure}
+
+%================================================================
+\section{Resultados esperados}
+%================================================================
+
+\begin{itemize}[leftmargin=1.3em, itemsep=2pt]
+  \item Curvas de tensi\'on m\'axima, reacci\'on en el perno m\'as cargado y flecha en funci\'on de
+        $t$ para cada distribuci\'on de pernos.
+  \item Mapa de dise\~nos factibles en el plano (espesor, separaci\'on de pernos) con curvas de costo
+        constante, y el dise\~no de menor costo para distintas relaciones $c_p/c_a$.
+  \item Comparaci\'on del dise\~no \'optimo con el original (20~mm, pernos a 300~mm): ahorro de acero y
+        de pernos, y margen frente a las tensiones admisibles.
+  \item Mapas de tensi\'on de Von Mises y deformada del blindaje \'optimo, para identificar las zonas
+        cr\'iticas (esquinas del caj\'on, extremos y pernos de borde).
+\end{itemize}
+
+Con esto, el proyecto busca mostrar c\'omo un modelo de elementos finitos 3D propio, validado contra
+soluciones conocidas, permite pasar de un dise\~no conservador verificado a un dise\~no optimizado, y
+cuantificar la relaci\'on entre espesor de plancha y cantidad de pernos en un blindaje real.
+
+\end{document}
