@@ -12,10 +12,12 @@ funciones/                  # la librería de MEF, por etapas
   etapa1_malla/             #   elementos (caras, validación), mallador estructurado, malla del túnel
   etapa2_interpolacion/     #   funciones de forma H8 / H20 / H27 (y Q4 / Q8 / Q9 para las caras)
   etapa3_matrices/          #   D, puntos de Gauss, B y jacobiano, K global dispersa, fuerzas de presión
-  etapa4_resolver/          #   restricciones, solución K U = F dispersa, tensiones y von Mises
+  etapa4_resolver/          #   restricciones, solución K U = F dispersa, tensiones, von Mises y simetría
   etapa5_graficar/          #   malla 3D, desarrollo del túnel, curvas de comparación
 codigo/
-  tunel/problema_tunel.py   # el problema del blindaje (malla, pernos, presión hidrostática)
+  tunel/problema_tunel.py   # datos del blindaje: carga, pernos, malla (acá se cambia todo)
+  tunel/resolver_tunel.py   # arma y resuelve K U = F y guarda resultados/<nombre>.npz
+  tunel/analizar_tunel.py   # lee el .npz: tablas (MPa, kN) y figuras de deformada y tensiones
   pruebas/                  # verificación de la implementación (ver abajo)
 propuesta/                  # propuesta del trabajo (LaTeX + PDF)
 ```
@@ -26,8 +28,13 @@ Los scripts de `codigo/` agregan `funciones/` al path solos, así que se corren 
 
 ```bash
 pip install -r requirements.txt
-python3 codigo/tunel/problema_tunel.py
+python3 codigo/tunel/problema_tunel.py    # ver la malla y los pernos
+python3 codigo/tunel/resolver_tunel.py    # resolver (con simetría en x = 0 resuelve la mitad)
+python3 codigo/tunel/analizar_tunel.py    # analizar el último resultado guardado
 ```
+
+Los `.npz` de `resultados/` no se suben (pesan decenas de MB); se regeneran con `resolver_tunel.py`.
+Las figuras de cada caso sí están en `codigo/tunel/resultados/`.
 
 ## Pruebas (`codigo/pruebas/`)
 

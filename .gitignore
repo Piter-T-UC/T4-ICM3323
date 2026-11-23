@@ -17,3 +17,6 @@ __pycache__/
 # Editores
 .vscode/
 .idea/
+
+# Resultados numericos del MEF (pesados, se regeneran con resolver_tunel.py)
+*.npz

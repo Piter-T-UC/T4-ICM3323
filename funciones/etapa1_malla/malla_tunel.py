@@ -85,23 +85,40 @@ def pernos_grilla(a, b, L, ancho_plancha, borde, paso_s, paso_z):
 ##   h: tamano maximo de elemento en s y z, n_t: elementos en el espesor
 ##   d_perno: si > 0 se agregan lineas a +-d/2 de cada perno, para apoyar un parche d x d en vez de
 ##            un solo nodo (un apoyo puntual en un solido da tension infinita en ese punto)
+##   mitad: True malla solo x >= 0 (para usar la simetria en el plano x = 0). El contorno va de la
+##          mitad del piso (s = -a/2, que es s + perimetro) a la mitad del techo (s = b + a/2).
+##          Siempre hay una linea de malla en x = 0, asi la malla completa y la mitad coinciden
 ## Devuelve xy (n, 3), conectividad e info (dict con todo lo necesario para apoyos y graficos)
-def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno=0.0):
+def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno=0.0, mitad=False):
     largo = _paredes(a, b)[3]
     s_esq = np.r_[0, np.cumsum(largo)]
+    perimetro = s_esq[-1]
     zu = uniones_planchas(L, ancho_plancha)
     pernos = np.asarray(pernos, dtype=float)
+    tol = 1e-9
 
-    # Lineas de la grilla: pasan por esquinas, uniones de planchas y pernos (+- d/2)
+    if mitad:
+        s_ini, s_fin = -a/2, b + a/2
+        s_p = np.where(pernos[:, 0] > s_fin + tol, pernos[:, 0] - perimetro, pernos[:, 0])
+        dentro = (s_p >= s_ini - tol) & (s_p <= s_fin + tol)
+        pernos, s_p = pernos[dentro], s_p[dentro]
+        s_fijos = np.r_[s_ini, 0, b, s_fin]
+    else:
+        s_p = pernos[:, 0]
+        s_fijos = np.r_[s_esq, b + a/2, 2*b + 1.5*a]           # esquinas y x = 0 (techo y piso)
+
+    # Lineas de la grilla: pasan por esquinas, x = 0, uniones de planchas y pernos (+- d/2)
     desfases = [0.0] if d_perno <= 0 else [-d_perno/2, 0.0, d_perno/2]
-    s_lin = lineas(np.r_[(s_esq, *[pernos[:, 0] + d for d in desfases])], h)
+    s_lin = lineas(np.r_[(s_fijos, *[s_p + d for d in desfases])], h)
+    if mitad:
+        s_lin = s_lin[(s_lin >= s_ini - tol) & (s_lin <= s_fin + tol)]
     z_lin = lineas(np.r_[(zu, *[pernos[:, 1] + d for d in desfases])], h)
     r_lin = np.linspace(0, t, n_t + 1)
 
     # Grilla de esquinas X[i, j, k] = P(s_i) + r_k d(s_i) en el plano, z_j en el eje
     X = np.zeros((len(s_lin), len(z_lin), len(r_lin), 3))
     for i, s in enumerate(s_lin):
-        P, d = _punto_contorno(s, a, b)
+        P, d = _punto_contorno(s % perimetro, a, b)
         X[i, :, :, :2] = P + r_lin[None, :, None]*d
         X[i, :, :, 2] = z_lin[:, None]
 
@@ -110,7 +127,7 @@ def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno
     # Pared y plancha de cada elemento (segun el centro de su celda)
     s_c = (s_lin[celda[:, 0]] + s_lin[celda[:, 0] + 1])/2
     z_c = (z_lin[celda[:, 1]] + z_lin[celda[:, 1] + 1])/2
-    pared = np.searchsorted(s_esq, s_c) - 1
+    pared = np.searchsorted(s_esq, s_c % perimetro) - 1
     plancha = np.searchsorted(zu, z_c) - 1
 
     # Pernos en 3D (sobre la cara exterior)
@@ -119,8 +136,8 @@ def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno
         P, d = _punto_contorno(s, a, b)
         pernos_xyz.append([*(P + t*d), z])
 
-    info = dict(a=a, b=b, L=L, t=t, tipo=tipo, ancho_plancha=ancho_plancha, d_perno=d_perno,
-                s_lin=s_lin, z_lin=z_lin, s_esquinas=s_esq, z_uniones=zu,
+    info = dict(a=a, b=b, L=L, t=t, tipo=tipo, ancho_plancha=ancho_plancha, d_perno=d_perno, mitad=mitad,
+                s_lin=s_lin % perimetro, z_lin=z_lin, s_esquinas=s_esq, z_uniones=zu,
                 pernos_sz=pernos, pernos_xyz=np.array(pernos_xyz),
                 pared=pared, plancha=plancha)
     return xy, conectividad, info

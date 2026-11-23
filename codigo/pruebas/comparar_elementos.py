@@ -11,17 +11,17 @@ from casos_3d import resolver_pano, resolver_voladizo
 from etapa5_graficar.graficar_comparacion import graficar_curvas
 
 mm = ureg.mm
-kgf_cm2 = ureg.kgf/ureg.cm**2
+MPa = ureg.MPa
 
 
 # Comparacion de los hexaedros H8 / H20 / H27 en problemas con solucion conocida, pensados para el
 # blindaje: plancha delgada en flexion apoyada en pernos. Cambiar los datos de aca y volver a correr.
 
 # Material y plancha (los del blindaje)
-E = 2.1e6 * kgf_cm2
+E = 205_940 * MPa                # = 2.1e6 kgf/cm2
 nu = 0.3
 t = 18 * mm
-q = 3.299 * kgf_cm2
+q = 0.3235 * MPa                 # = 3.299 kgf/cm2
 
 # ---- Prueba 1: pano de plancha entre 4 pernos (grilla cuadrada de paso a) ----------------------
 # Kirchhoff exacto (serie de Fourier) vs MEF en 1/4 de pano, refinando la malla
