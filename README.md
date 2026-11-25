@@ -18,6 +18,8 @@ codigo/
   tunel/problema_tunel.py   # datos del blindaje: carga, pernos, malla (acá se cambia todo)
   tunel/resolver_tunel.py   # arma y resuelve K U = F y guarda resultados/<nombre>.npz
   tunel/analizar_tunel.py   # lee el .npz: tablas (MPa, kN) y figuras de deformada y tensiones
+  tunel/variaciones.py      # barrido de espesor x paso de pernos x carga; escribe resultados/variaciones.csv
+  tunel/graficar_variaciones.py  # figuras del barrido (flecha, von Mises, pernos, utilización)
   pruebas/                  # verificación de la implementación (ver abajo)
 propuesta/                  # propuesta del trabajo (LaTeX + PDF)
 ```
@@ -29,12 +31,25 @@ Los scripts de `codigo/` agregan `funciones/` al path solos, así que se corren 
 ```bash
 pip install -r requirements.txt
 python3 codigo/tunel/problema_tunel.py    # ver la malla y los pernos
-python3 codigo/tunel/resolver_tunel.py    # resolver (con simetría en x = 0 resuelve la mitad)
+python3 codigo/tunel/resolver_tunel.py    # resolver (con simetría en x = 0 y z = L/2 resuelve un cuarto)
 python3 codigo/tunel/analizar_tunel.py    # analizar el último resultado guardado
 ```
 
 Los `.npz` de `resultados/` no se suben (pesan decenas de MB); se regeneran con `resolver_tunel.py`.
 Las figuras de cada caso sí están en `codigo/tunel/resultados/`.
+
+### Simetría, pernos y variaciones
+
+- `simetria` (x = 0) y `simetria_z` (z = L/2) en `problema_tunel.py`: se resuelve un cuarto del túnel y
+  `resolver_tunel.py` refleja los resultados en cada plano. La presión hidrostática no es simétrica en y,
+  por eso el segundo plano es z. El cuarto reproduce el modelo de la mitad a ~1e-11 (relativo).
+- `perno_cara = True` con `d_perno > 0`: cada perno fija la cara completa de un hexaedro de lado
+  `d_perno` (9 nodos en H27) en vez de un solo nodo.
+- `variaciones.py` corre el barrido en paralelo pisando datos con la variable de entorno
+  `T4_OVERRIDE='{"t": 12, "paso_s": 300}'` (longitudes en mm), sin editar `problema_tunel.py`.
+- Con el perno como cara de 50 mm el von Mises se mide a más de 100 mm de los pernos: el borde
+  empotrado del parche es singular y más cerca el máximo depende del radio de exclusión.
+  `variaciones_mitad_h100.*` es el barrido anterior (un nodo por perno, h = 100 mm).
 
 ## Pruebas (`codigo/pruebas/`)
 

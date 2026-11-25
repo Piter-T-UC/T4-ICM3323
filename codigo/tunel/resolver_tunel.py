@@ -17,8 +17,8 @@ from etapa3_matrices.gen_f_presion import gen_f_presion
 from etapa4_resolver.restricciones import Restriciones
 from etapa4_resolver.sistema_disperso import resolver_disperso
 from etapa4_resolver.tensiones import calc_tensiones
-from etapa4_resolver.simetria import (reflejar_malla, reflejar_campo, reflejar_fuerza, ESPEJO_U,
-                                      ESPEJO_SIGMA)
+from etapa4_resolver.simetria import (reflejar_malla, reflejar_campo, reflejar_fuerza, espejo_u,
+                                      espejo_sigma)
 
 
 # Resuelve el blindaje armado en problema_tunel.py y guarda todo en un .npz (floats SI: m, N, Pa)
@@ -74,28 +74,45 @@ xy_g, conec_g, apoyos_g = P.xy_m, np.asarray(P.conectividad), P.apoyos
 U_g, F_g, R_g, sn_g, se_g = U.reshape(-1, 3), F.reshape(-1, 3), R3, sigma_nodos, np.array(sigma_elem)
 pared_g, plancha_g, sz_g = info["pared"], info["plancha"], info["pernos_sz"]
 
-# Con simetria se resolvio la mitad x >= 0: se refleja en x = 0 para guardar el tunel completo
-if P.simetria:
-    xy_g, conec_g, espejo, plano, otros = reflejar_malla(P.xy_m, P.conectividad)
-    U_g = reflejar_campo(U_g, plano, otros, ESPEJO_U)
-    sn_g = reflejar_campo(sn_g, plano, otros, ESPEJO_SIGMA)
-    se_g = np.concatenate([se_g, se_g*ESPEJO_SIGMA])
-    F_g, R_g = reflejar_fuerza(F_g, plano, otros), reflejar_fuerza(R_g, plano, otros)
-    pared_g = np.r_[pared_g, np.array([2, 1, 0, 3])[pared_g]]          # derecha <-> izquierda
-    plancha_g = np.r_[plancha_g, plancha_g]
-    lado = ~plano[P.apoyos[:, 0]]
-    apoyos_g = np.vstack([P.apoyos, np.column_stack([espejo[P.apoyos[lado, 0]], P.apoyos[lado, 1:]])])
+# Con simetria se resolvio solo un lado de cada plano (x >= 0 y/o z <= L/2): se refleja en cada plano
+# para guardar el tunel completo. Se refleja primero en z = L/2 y despues en x = 0
+perimetro = info["s_esquinas"][-1]
+n_planchas = len(info["z_uniones"]) - 1
+planos = ([(2, m(P.L)/2)] if P.simetria_z else []) + ([(0, 0.0)] if P.simetria else [])
+for eje, valor in planos:
+    eu, es = espejo_u(eje), espejo_sigma(eje)
+    xy_g, conec_g, espejo, plano, otros = reflejar_malla(xy_g, conec_g, eje, valor)
+    U_g = reflejar_campo(U_g, plano, otros, eu)
+    sn_g = reflejar_campo(sn_g, plano, otros, es)
+    se_g = np.concatenate([se_g, se_g*es])
+    F_g, R_g = reflejar_fuerza(F_g, plano, otros, eu), reflejar_fuerza(R_g, plano, otros, eu)
+    if eje == 0:
+        pared_g = np.r_[pared_g, np.array([2, 1, 0, 3])[pared_g]]       # derecha <-> izquierda
+        plancha_g = np.r_[plancha_g, plancha_g]
+    else:
+        pared_g = np.r_[pared_g, pared_g]
+        plancha_g = np.r_[plancha_g, n_planchas - 1 - plancha_g]        # z -> L - z invierte las planchas
+    lado = ~plano[apoyos_g[:, 0]]
+    apoyos_g = np.vstack([apoyos_g, np.column_stack([espejo[apoyos_g[lado, 0]], apoyos_g[lado, 1:]])])
     # pernos: los del plano (si hay) suman las dos mitades; los demas se duplican reflejados.
-    # s del reflejado: s' = (2b + a - s) mod perimetro (derecha <-> izquierda, techo y piso al reves)
-    en_plano = np.isclose(pxyz[:, 0], 0, atol=1e-9)
-    fuerza_perno[en_plano] += fuerza_perno[en_plano]*ESPEJO_U
-    perimetro = info["s_esquinas"][-1]
-    pxyz = np.vstack([pxyz, pxyz[~en_plano]*ESPEJO_U])
-    normal = np.vstack([normal, normal[~en_plano]*ESPEJO_U])
-    fuerza_perno = np.vstack([fuerza_perno, fuerza_perno[~en_plano]*ESPEJO_U])
-    sz_g = np.vstack([sz_g, np.c_[(2*b + a - sz_g[~en_plano, 0]) % perimetro, sz_g[~en_plano, 1]]])
+    en_plano = np.isclose(pxyz[:, eje], valor, atol=1e-9)
+    fuerza_perno[en_plano] += fuerza_perno[en_plano]*eu
+    pxyz_e = pxyz[~en_plano].copy()
+    pxyz_e[:, eje] = 2*valor - pxyz_e[:, eje]
+    sz_e = sz_g[~en_plano].copy()
+    if eje == 0:     # s del reflejado: s' = (2b + a - s) mod perimetro (derecha <-> izquierda, techo y piso al reves)
+        sz_e[:, 0] = (2*b + a - sz_e[:, 0]) % perimetro
+    else:            # el reflejado en z tiene el mismo s y z' = L - z
+        sz_e[:, 1] = m(P.L) - sz_e[:, 1]
+    pxyz = np.vstack([pxyz, pxyz_e])
+    normal = np.vstack([normal, normal[~en_plano]*eu])
+    fuerza_perno = np.vstack([fuerza_perno, fuerza_perno[~en_plano]*eu])
+    sz_g = np.vstack([sz_g, sz_e])
     nodos_p = nodos_p + [list(espejo[nodos]) for nodos, e in zip(nodos_p, en_plano) if not e]
-    print(f"  simetria: resuelta la mitad ({3*len(P.xy)} GDL), reflejada a {len(xy_g)} nodos")
+if planos:
+    print(f"  simetria ({'x = 0' if P.simetria else ''}{' y ' if P.simetria and P.simetria_z else ''}"
+          f"{'z = L/2' if P.simetria_z else ''}): resuelta 1/{2**len(planos)} ({3*len(P.xy)} GDL), "
+          f"reflejada a {len(xy_g)} nodos")
 
 datos = dict(
     titulo=P.titulo, fecha=datetime.now().isoformat(timespec="seconds"), tipo=P.tipo,
@@ -103,7 +120,7 @@ datos = dict(
     ancho_plancha=m(P.ancho_plancha), borde=m(P.borde), paso_s=m(P.paso_s), paso_z=m(P.paso_z),
     d_perno=m(P.d_perno), h=m(P.h), n_t=P.n_t, extremos_fijos=P.extremos_fijos, carga=P.carga,
     p_radier=P.p(0, -m(P.b)/2, 0).to(ureg.Pa).magnitude, p_techo=P.p(0, m(P.b)/2, 0).to(ureg.Pa).magnitude,
-    simetria=P.simetria, n_gdl_resuelto=3*len(P.xy),          # GDL del sistema que se resolvio
+    simetria=P.simetria, simetria_z=P.simetria_z, perno_cara=P.perno_cara, n_gdl_resuelto=3*len(P.xy),          # GDL del sistema que se resolvio
     n_nodos=len(xy_g), n_elem=len(conec_g), n_gdl=3*len(xy_g), tiempos=reloj,   # del tunel completo
 )
 

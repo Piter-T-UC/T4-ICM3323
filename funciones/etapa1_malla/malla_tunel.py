@@ -88,14 +88,27 @@ def pernos_grilla(a, b, L, ancho_plancha, borde, paso_s, paso_z):
 ##   mitad: True malla solo x >= 0 (para usar la simetria en el plano x = 0). El contorno va de la
 ##          mitad del piso (s = -a/2, que es s + perimetro) a la mitad del techo (s = b + a/2).
 ##          Siempre hay una linea de malla en x = 0, asi la malla completa y la mitad coinciden
+##   mitad_z: True malla solo z <= L/2 (segunda simetria, en el plano z = L/2; junto con 'mitad' queda
+##            un cuarto del tunel). Los pernos tienen que ser simetricos respecto a z = L/2
+##   cara_perno: True (con d_perno > 0) el perno queda al CENTRO de un solo hexaedro de lado d_perno en
+##            la cara exterior (lineas a +-d/2, ninguna en el perno) y fija la cara completa de ese
+##            hexaedro (4, 8 o 9 nodos segun H8, H20 o H27). Para que sea un solo hexaedro d_perno <= h
 ## Devuelve xy (n, 3), conectividad e info (dict con todo lo necesario para apoyos y graficos)
-def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno=0.0, mitad=False):
+def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno=0.0, mitad=False,
+                mitad_z=False, cara_perno=False):
     largo = _paredes(a, b)[3]
     s_esq = np.r_[0, np.cumsum(largo)]
     perimetro = s_esq[-1]
     zu = uniones_planchas(L, ancho_plancha)
     pernos = np.asarray(pernos, dtype=float)
     tol = 1e-9
+
+    if mitad_z:
+        for s, z in pernos:
+            if not np.any(np.all(np.isclose(pernos, [s, L - z], atol=tol), axis=1)):
+                raise ValueError(f"el perno (s = {s:.4f}, z = {z:.4f}) no tiene su simetrico en z = L/2: "
+                                 "no se puede usar mitad_z")
+        pernos = pernos[pernos[:, 1] <= L/2 + tol]
 
     if mitad:
         s_ini, s_fin = -a/2, b + a/2
@@ -108,11 +121,19 @@ def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno
         s_fijos = np.r_[s_esq, b + a/2, 2*b + 1.5*a]           # esquinas y x = 0 (techo y piso)
 
     # Lineas de la grilla: pasan por esquinas, x = 0, uniones de planchas y pernos (+- d/2)
-    desfases = [0.0] if d_perno <= 0 else [-d_perno/2, 0.0, d_perno/2]
+    if d_perno <= 0:
+        desfases = [0.0]
+    elif cara_perno:
+        desfases = [-d_perno/2, d_perno/2]                  # el perno queda al centro de un hexaedro
+    else:
+        desfases = [-d_perno/2, 0.0, d_perno/2]
     s_lin = lineas(np.r_[(s_fijos, *[s_p + d for d in desfases])], h)
     if mitad:
         s_lin = s_lin[(s_lin >= s_ini - tol) & (s_lin <= s_fin + tol)]
-    z_lin = lineas(np.r_[(zu, *[pernos[:, 1] + d for d in desfases])], h)
+    z_fijos = np.r_[zu, L/2] if mitad_z else zu             # con simetria en z siempre hay linea en L/2
+    z_lin = lineas(np.r_[(z_fijos, *[pernos[:, 1] + d for d in desfases])], h)
+    if mitad_z:
+        z_lin = z_lin[z_lin <= L/2 + tol]
     r_lin = np.linspace(0, t, n_t + 1)
 
     # Grilla de esquinas X[i, j, k] = P(s_i) + r_k d(s_i) en el plano, z_j en el eje
@@ -137,6 +158,7 @@ def malla_tunel(a, b, L, t, ancho_plancha, pernos, h, n_t=1, tipo="H20", d_perno
         pernos_xyz.append([*(P + t*d), z])
 
     info = dict(a=a, b=b, L=L, t=t, tipo=tipo, ancho_plancha=ancho_plancha, d_perno=d_perno, mitad=mitad,
+                mitad_z=mitad_z, cara_perno=cara_perno,
                 s_lin=s_lin % perimetro, z_lin=z_lin, s_esquinas=s_esq, z_uniones=zu,
                 pernos_sz=pernos, pernos_xyz=np.array(pernos_xyz),
                 pared=pared, plancha=plancha)
@@ -150,7 +172,8 @@ def en_exterior(info):
 
 
 ## Nodos de la cara exterior tomados por cada perno: el nodo del perno o, si d_perno > 0, el
-## parche d x d a su alrededor. Devuelve una lista de nodos por perno
+## parche d x d a su alrededor (con cara_perno son los nodos de la cara de un solo hexaedro).
+## Devuelve una lista de nodos por perno
 def nodos_pernos(xy, info, tol=1e-6):
     xy_m = _sin_unidades(xy)
     ext = en_exterior(info)

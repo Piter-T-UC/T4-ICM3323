@@ -1,3 +1,5 @@
+import json
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "funciones"))
@@ -84,6 +86,9 @@ paso_z = 500 * mm               # separacion maxima entre pernos a lo largo del 
 #   tipo     "H8" | "H20" | "H27". H8 se traba en flexion con 1 elemento en el espesor (verificar_viga.py)
 #   d_perno  refinamiento LOCAL en los pernos: > 0 agrega lineas a +-d/2 de cada perno y el perno fija un
 #            parche de d x d (impide el giro, como la cabeza de 100 mm del informe). 0 = un nodo (rotula)
+#   perno_cara  True (con d_perno > 0): el perno queda al centro de UN hexaedro de lado d_perno y fija la
+#            cara completa de ese hexaedro (9 nodos en H27, 8 en H20, 4 en H8), sin linea en el perno.
+#            Pedir d_perno <= h. False = parche con linea central (2 x 2 hexaedros de lado d/2)
 #
 # Tamano del problema con esta geometria (GDL del tunel completo y de la mitad, con simetria = True).
 # Medido con el solver directo: 55 mil GDL ~11 s, 111 mil GDL ~47 s y 3.4 GB de memoria; la memoria
@@ -99,9 +104,11 @@ paso_z = 500 * mm               # separacion maxima entre pernos a lo largo del 
 tipo = "H27"
 h = 50 * mm
 n_t = 2
-d_perno = 0 * mm
-# Pernos M20 soldados a la cara exterior: ux = uy = uz = 0 en el perno, giro libre (rotula), como en
-# el informe. En un solido los nodos no tienen giros, asi que fijar UN nodo por perno ya deja girar.
+d_perno = 50 * mm
+perno_cara = True
+# d_perno = 0: pernos M20 soldados a la cara exterior con ux = uy = uz = 0 en UN nodo, giro libre
+# (rotula), como en el informe. En un solido los nodos no tienen giros, asi que fijar UN nodo por perno
+# ya deja girar. Con perno_cara se fija la cara completa de un hexaedro (apoyo de area finita)
 # ---------------------------------------------------------------------------------------------
 
 # Bordes z = 0 y z = L: el informe supone que donde una plancha toca a otra no hay desplazamiento
@@ -113,6 +120,18 @@ extremos_fijos = True
 # En y NO hay simetria (el radier tiene mas presion que el techo)
 simetria = True
 
+# Simetria en el plano z = L/2: con planchas de ancho w y L = 2w (o cualquier L con pernos simetricos
+# respecto a L/2) el tramo es simetrico en z, y la presion tampoco depende de z. Junto con la de
+# x = 0 se resuelve un CUARTO del tunel (z <= L/2, x >= 0), con uz = 0 en z = L/2. Si los pernos no
+# son simetricos respecto a L/2, malla_tunel avisa
+simetria_z = True
+
+# Variaciones (variaciones.py): la variable de entorno T4_OVERRIDE pisa datos de arriba sin editar el
+# archivo, p. ej. T4_OVERRIDE='{"t": 12, "paso_s": 300}'. Las longitudes van en mm
+for _nombre, _valor in json.loads(os.environ.get("T4_OVERRIDE", "{}")).items():
+    globals()[_nombre] = _valor*mm if _nombre in ("t", "ancho_plancha", "borde", "paso_s", "paso_z",
+                                                  "h", "d_perno") else _valor
+
 
 # --- Malla -----------------------------------------------------------------------------------
 m = lambda v: v.to(ureg.m).magnitude
@@ -121,7 +140,8 @@ pernos = pernos_grilla(m(a), m(b), m(L), m(ancho_plancha), m(borde), m(paso_s), 
 # pernos = np.array([(s, z) for ...])
 
 xy_m, conectividad, info = malla_tunel(m(a), m(b), m(L), m(t), m(ancho_plancha), pernos,
-                                       m(h), n_t, tipo, m(d_perno), mitad=simetria)
+                                       m(h), n_t, tipo, m(d_perno), mitad=simetria, mitad_z=simetria_z,
+                                       cara_perno=perno_cara)
 xy = (xy_m * ureg.m).to(mm)
 validar_malla(xy, conectividad)
 
@@ -133,6 +153,8 @@ if extremos_fijos:
     r[nodos_en(xy, lambda x, y, z: np.isclose(z, 0) or np.isclose(z, m(L)))] = 1
 if simetria:
     r[nodos_en(xy, lambda x, y, z: np.isclose(x, 0)), 0] = 1
+if simetria_z:
+    r[nodos_en(xy, lambda x, y, z: np.isclose(z, m(L)/2)), 2] = 1
 filas = np.flatnonzero(r.any(axis=1))
 apoyos = np.column_stack([filas, r[filas]])
 
@@ -165,19 +187,21 @@ if __name__ == "__main__":
     print(f"  {n_planchas} plancha(s) de {ancho_plancha:~} por pared (4 paredes), "
           f"{len(pernos)} pernos (borde {borde:~}, paso {paso_s:~} x {paso_z:~})")
     print(f"  peso del acero: {(rho*volumen).to(ureg.kg):.0f~}")
-    print(f"  malla {tipo}{' (MITAD x >= 0, simetria)' if simetria else ''}: {len(xy)} nodos, "
+    lado = ' + '.join(c for c, v in (("x >= 0", simetria), ("z <= L/2", simetria_z)) if v)
+    print(f"  malla {tipo}{f' (solo {lado}, simetria)' if lado else ''}: {len(xy)} nodos, "
           f"{len(conectividad)} elementos, {3*len(xy)} GDL, {len(apoyos)} nodos con apoyo, "
           f"{len(presiones)} caras con presion")
     # Revision: en la pared derecha p es lineal en y -> la fuerza total es la presion a media altura
     # (y = 0) por el area exterior (b + 2t) L
-    F_teo = (p(0, 0, 0)*(b + 2*t)*L).to(ureg.kN).magnitude
+    Lm = L/2 if simetria_z else L                               # largo modelado
+    F_teo = (p(0, 0, 0)*(b + 2*t)*Lm).to(ureg.kN).magnitude
     print(f"  revision: Fx en la pared derecha = {F[0::3][xy_m[:, 0] > 0].sum()/1e3:.1f} kN "
           f"(p(media altura) (b + 2t) L = {-F_teo:.1f} kN)")
     # Empuje neto hacia arriba: diferencia de presion entre las caras exteriores del piso y del techo
     dp = p(0, -m(b)/2 - m(t), 0) - p(0, m(b)/2 + m(t), 0)
     ancho = (a/2 + t) if simetria else (a + 2*t)
     print(f"            Fy neto (empuje hacia arriba) = {F[1::3].sum()/1e3:.1f} kN "
-          f"(dp {'(a/2 + t)' if simetria else '(a + 2t)'} L = {(dp*ancho*L).to(ureg.kN).magnitude:.1f} kN)")
+          f"(dp {'(a/2 + t)' if simetria else '(a + 2t)'} L = {(dp*ancho*Lm).to(ureg.kN).magnitude:.1f} kN)")
 
 
     # --- Graficos --------------------------------------------------------------------------------

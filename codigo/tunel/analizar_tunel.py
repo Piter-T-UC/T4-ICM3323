@@ -101,8 +101,10 @@ def donde(n):
 
 # --- Resumen -------------------------------------------------------------------------------------
 print(f"{d['titulo']}  ({archivo.name}, resuelto {d['fecha']})")
-if d.get("simetria"):
-    print(f"  resuelto con simetria en x = 0: {d['n_gdl_resuelto']} GDL (la mitad), reflejado al tunel completo")
+planos = [p for p, v in (("x = 0", d.get("simetria")), ("z = L/2", d.get("simetria_z"))) if v]
+if planos:
+    print(f"  resuelto con simetria en {' y '.join(planos)}: {d['n_gdl_resuelto']} GDL "
+          f"(1/{2**len(planos)} del tunel), reflejado al tunel completo")
 print(f"  malla {d['tipo']}: {d['n_nodos']} nodos, {d['n_elem']} elementos, {d['n_gdl']} GDL, "
       f"{len(pernos_xyz)} pernos, extremos fijos: {d['extremos_fijos']}")
 print(f"  t = {t*mm:.0f} mm, presion {d.get('carga', 'hidrostatica')}: {d['p_radier']*MPa:.4f} MPa (radier) a "
